@@ -22,32 +22,34 @@
 # SOFTWARE.
 
 import rclpy
+import board
+import busio
+import adafruit_icm20x
 from rclpy.node import Node
+import time
 
 from sensor_msgs.msg import Imu
 from sensor_msgs.msg import Temperature
 from sensor_msgs.msg import MagneticField
 
-from icm20948 import ICM20948
-
-PUBLISH_RATE = 20  # per second
+PUBLISH_RATE = 200  # per second
 PUBLISH_INTERVAL_S = 1 / PUBLISH_RATE
 SLOW_PUBLISH_INTERVAL_S = 1.0
 
+i2c_bus0=(busio.I2C(board.SCL_1, board.SDA_1))
+
+icm = adafruit_icm20x.ICM20948(i2c_bus0, 0x68)
 
 class ImuNode(Node):
-    def __init__(self, imu):
+    def __init__(self):
         # Initialise the Node.
         super().__init__("imu_icm20948")
-        self._imu = imu
         self.get_logger().info("IMU has started!")
         # Set up Publishers
         self.imu_raw_publisher_ = self.create_publisher(Imu, "imu/data_raw", 10)
-        self.imu_temp_publisher_ = self.create_publisher(Temperature, "imu/temp", 10)
         self.imu_mag_publisher_ = self.create_publisher(MagneticField, "imu/mag", 10)
         # Timers.
         self.data_timer_ = self.create_timer(PUBLISH_INTERVAL_S, self._publish_all)
-        self.temperature_timer_ = self.create_timer(SLOW_PUBLISH_INTERVAL_S, self._publish_temperature)
 
     def _setup_imu(self):
         """
@@ -55,29 +57,19 @@ class ImuNode(Node):
         Note: Most of the default settings are fine but this is provided so that
         the user can change settings if they want to.
         """
-        # This sequence is copied from the library initialisation code.
-        # Write to bank 2 to configure the settings.
-        self._imu.bank(2)
+        # Set the accelerometer range
+        icm.accelerometer_range = AccelRange.RANGE_4G
 
-        # Set sample rate in Hz.  Default = 100Hz, max = 225Hz.
-        self._imu.set_gyro_sample_rate(100)
-        # Set full scale range of gyroscope in degrees per second.
-        # Valid values are 250, 500, 1000, 2000.
-        self._imu.set_gyro_full_scale(250)
-        # Read the code and the datasheet to see what this does.
-        # self._imu.set_gyro_low_pass(enabled=True, mode=5)
+        # Set sample rate to max
+        icm.accelerometer_data_rate = 1125
+        
+        # Set the gyro DPS setting
+        icm.gyro_range = GyroRange.RANGE_500_DPS
 
-        # Set sample rate in Hz.  Default = 125Hz, max = 1kHz.
-        self._imu.set_accelerometer_sample_rate(125)
-        # Set full scale range of accelerometer in g.
-        # Valid values are 2, 4, 8, 16.
-        self._imu.set_accelerometer_full_scale(4)
-        # Read the code and the datasheet to see what this does.
-        # self._imu.set_accelerometer_low_pass(enabled=True, mode=5)
-
-        # Return to normal mode.
-        self._imu.bank(0)
-
+        # Set the gyro rate max
+        icm.gyro_data_rate = 1100
+        pass
+    
     def _publish_all(self):
         # Get all readings.
         self._publish_raw()
@@ -85,41 +77,38 @@ class ImuNode(Node):
 
     def _publish_raw(self):
         msg = Imu()
-        ax, ay, az, gx, gy, gz = self._imu.read_accelerometer_gyro_data()
         # Note: raw gyroscope data is reported in degrees per second.
-        msg.angular_velocity.x = float(gx)
-        msg.angular_velocity.y = float(gy)
-        msg.angular_velocity.z = float(gz)
+        ax, ay, az = icm.acceleration
+        vx, vy, vz = icm.gyro
+	
+        msg.angular_velocity.x = float(vx)
+        msg.angular_velocity.y = float(vy)
+        msg.angular_velocity.z = float(vz)
         # Note: raw acceleration is reported in degrees per second.
         msg.linear_acceleration.x = float(ax)
         msg.linear_acceleration.y = float(ay)
         msg.linear_acceleration.z = float(az)
+        msg.header.frame_id = "robot_imu"
+        msg.header.stamp = self.get_clock().now().to_msg() 
         # Publish the message.
         self.imu_raw_publisher_.publish(msg)
 
     def _publish_magnetic(self):
         msg = MagneticField()
-        x, y, z = self._imu.read_magnetometer_data()
+        x, y, z = icm.magnetic
         # Convert from micro-Teslas to Teslas.
         msg.magnetic_field.x = float(x) / 1000.0
         msg.magnetic_field.y = float(y) / 1000.0
         msg.magnetic_field.z = float(z) / 1000.0
         # Publish the message.
+        msg.header.frame_id = "robot_mag"
+        msg.header.stamp = self.get_clock().now().to_msg()
         self.imu_mag_publisher_.publish(msg)
-
-    def _publish_temperature(self):
-        msg = Temperature()
-        temperature_deg_c = self._imu.read_temperature()
-        msg.temperature = float(temperature_deg_c)
-        self.get_logger().info("pub imu_temp" + str(msg.temperature))
-        # Publish the message.
-        self.imu_temp_publisher_.publish(msg)
 
 
 def main(args=None):
     rclpy.init(args=args)
-    imu = ICM20948()
-    node = ImuNode(imu)
+    node = ImuNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
