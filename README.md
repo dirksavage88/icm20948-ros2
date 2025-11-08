@@ -62,7 +62,7 @@ ros2 run icm20948_ros2 imu_node
 ```
 
 Example of orientation covariance visualization using imu tools Madgwick filter:
-<iframe width="560" height="315" src="https://www.youtube.com/embed/U9o7lGz_AtM?si=hJWm662veMZgVY9O" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+https://youtu.be/U9o7lGz_AtM
 
 ## Acknowledgements
 
