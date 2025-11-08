@@ -1,8 +1,6 @@
 # ROS 2 driver for ICM20948 IMU
 
-This ROS 2 driver of the ICM20948 implements a ROS2 wrapper around the Pimoroni Python library: [ICM20948-Python](https://github.com/pimoroni/icm20948-python/tree/master).
-
-My development notes can be found [here](development.md).
+This ROS 2 driver of the ICM20948 implements a ROS2 wrapper around the Adafruit ICM20X library: https://github.com/adafruit/Adafruit_CircuitPython_ICM20X/tree/main
 
 ## ROS Interfaces
 
@@ -10,25 +8,28 @@ This implementation has one node, `imu_icm20948`, that publishes on the followin
 
 | Message | Topic | Default Rate |
 |:--|:--|:--|
-| [sensor_msgs/msg/Imu](https://docs.ros2.org/latest/api/sensor_msgs/msg/Imu.html) | "imu/data_raw" | 20 Hz |
-| [sensor_msgs/msg/MagneticField](https://docs.ros2.org/latest/api/sensor_msgs/msg/MagneticField.html) | "imu/mag" | 20 Hz |
+| [sensor_msgs/msg/Imu](https://docs.ros2.org/latest/api/sensor_msgs/msg/Imu.html) | "imu/data_raw" | 200 Hz |
+| [sensor_msgs/msg/MagneticField](https://docs.ros2.org/latest/api/sensor_msgs/msg/MagneticField.html) | "imu/mag" | 200 Hz |
 | [sensor_msgs/msg/Temperature](https://docs.ros2.org/latest/api/sensor_msgs/msg/Temperature.html) | "imu/temp" | 1 Hz |
 
 Note: If you need a position estimate (Quaternion), the package `[IMU tools for ROS](https://github.com/CCNYRoboticsLab/imu_tools/tree/humble)` should be installed and launched.  Two filters are provided, Madgwick and complimentary (recommended).
 
-## To install and run on the Raspberry Pi
+## Installation on the Jetson Nano/TX2/Xavier
 
-To install on a Raspberry Pi, install ROS2 Humble on RPi.  Then run:
+Prerequisite: You willd need ROS2 Humble installed natively (via yocto meta-tegrademo) or in a docker container.  
+
+Run the following (if not native, you can add these dependencies to your docker file -just remove the sudo prefix):
 
 ```bash
-sudo pip3 install icm20948
+sudo pip3 install adafruit-circuitpython-icm20x
 sudo apt install i2c-tools
 ```
 
-Connect the IMU as per the wiring schedule in [development.md](development.md).  This should work.
+## Configuration ##
+Connect the IMU to the I2C-0 bus on the Jetson 40 pin gpio (we assume i2c bus 0 for this driver)
 
 ```bash
-sudo i2cdetect -y 1
+sudo i2cdetect -y 0
      0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
 00:          -- -- -- -- -- -- -- -- -- -- -- -- --
 10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -39,30 +40,30 @@ sudo i2cdetect -y 1
 60: -- -- -- -- -- -- -- -- 68 -- -- -- -- -- -- --
 70: -- -- -- -- -- -- -- --
 ```
-
-Now to allow the user to use the I2C buses without `sudo`.
-
+Bus permissions (access I2C buses without `sudo`) .
 ```bash
 sudo adduser $USER dialout
 ```
+Log out and in again.  Verify that `i2cdetect -y 0` works without `sudo``.
 
-Log out and in again.  Verify that `i2cdetect -y 1` works without `sudo``.
+**Note: If using certain boards where pullups are weak, this driver may only run if the bus clock speed on the jetson has been reduced to 100khz**
+```
+vi /sys/bus/i2c/devices/i2c-0/bus_clk_rate
+```
+Change 400000 to 100000
 
-## Getting the ROS 2 driver working
+## Clone and Build ##
+Create a local ros2 workspace overlay, clone this repo into the src folder (e.g. ~/ros_ws/src), and colcon build
 
-Now that the basics are set up, time to create a ROs2 driver.  Fortunately, I wrote a Python driver for the BNO055 a while ago so I'm starting with that.
+## Run the node ##
 
-Imported most of the files to create a package, changed the names but left the actual code in `imu.py` unchanged.  Made sure that `colcon build` worked and that I could launch the node (event though I know it would not run).
-
-Then I started modifying the code in
-
-## Known issues
-
-Work in progress so expect nothing to work!
-
-Please raise a GitHub issue on this repo if you find a problem.
+```
+ros2 run icm20948_ros2 imu_node
+```
 
 ## Acknowledgements
+
+**This repo is forked from https://github.com/RealRobotics/icm20948-ros2 with some modifications to use the adafruit library**
 
 &copy; 2023 University of Leeds.
 
