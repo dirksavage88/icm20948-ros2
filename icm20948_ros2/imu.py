@@ -88,7 +88,7 @@ class ImuNode(Node):
         msg.linear_acceleration.x = float(ax)
         msg.linear_acceleration.y = float(ay)
         msg.linear_acceleration.z = float(az)
-        msg.header.frame_id = "robot_imu"
+        msg.header.frame_id = "nanosaur_imu"
         msg.header.stamp = self.get_clock().now().to_msg() 
         # Publish the message.
         self.imu_raw_publisher_.publish(msg)
@@ -101,7 +101,7 @@ class ImuNode(Node):
         msg.magnetic_field.y = float(y) / 1000.0
         msg.magnetic_field.z = float(z) / 1000.0
         # Publish the message.
-        msg.header.frame_id = "robot_mag"
+        msg.header.frame_id = "nanosaur_mag"
         msg.header.stamp = self.get_clock().now().to_msg()
         self.imu_mag_publisher_.publish(msg)
 
